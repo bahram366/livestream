@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>پنل مدیریت | ورتکس لایو</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ============ Login ============ -->
+  <div id="screen-login" class="center-screen">
+    <div class="card panel fade-in" style="padding:26px;">
+      <div class="text-center" style="margin-bottom:20px;">
+        <div class="tally-dot live" style="margin:0 auto 10px;"></div>
+        <h1 class="brand-title">ورود به پنل مدیریت</h1>
+        <p class="brand-sub">مدیریت اتاق‌ها و تنظیمات ورتکس لایو</p>
+      </div>
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="label">نام کاربری</label>
+          <input id="login-username" class="input" autocomplete="username">
+        </div>
+        <div>
+          <label class="label">رمز عبور</label>
+          <input id="login-password" type="password" class="input" autocomplete="current-password">
+        </div>
+        <button id="login-btn" class="btn btn-primary w-full">ورود</button>
+        <p id="login-error" class="hidden" style="color:var(--tally);font-size:12.5px;text-align:center;"></p>
+        <p class="text-faint text-center" style="font-size:11.5px;">پیش‌فرض: admin / admin — پس از ورود از بخش تنظیمات تغییرش دهید.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Dashboard ============ -->
+  <div id="screen-dashboard" class="hidden" style="min-height:100vh;background:var(--bg-deep);">
+    <header class="header-bar" style="position:sticky;top:0;">
+      <div class="flex items-center gap-3">
+        <div class="tally-dot live"></div>
+        <span style="font-weight:800;">پنل مدیریت ورتکس لایو</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="chip" id="whoami-chip">—</span>
+        <button id="logout-btn" class="btn btn-sm btn-danger-ghost">خروج</button>
+      </div>
+    </header>
+
+    <main style="max-width:1000px;margin:0 auto;padding:24px 16px;display:flex;flex-direction:column;gap:20px;">
+
+      <section class="panel" style="padding:18px;">
+        <div class="flex items-center justify-between" style="margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <h2 style="font-weight:700;font-size:15px;">اتاق‌ها</h2>
+          <div class="flex gap-2">
+            <input id="new-room-name" class="input" placeholder="نام اختیاری اتاق (مثلاً: جلسه هفتگی)" style="width:240px;">
+            <button id="create-room-btn" class="btn btn-primary">+ ساخت اتاق جدید</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="rooms-table">
+            <thead>
+              <tr>
+                <th>کد اتاق</th>
+                <th>نام</th>
+                <th>وضعیت</th>
+                <th>حاضرین</th>
+                <th>ساخته‌شده</th>
+                <th>عملیات</th>
+              </tr>
+            </thead>
+            <tbody id="rooms-tbody"></tbody>
+          </table>
+        </div>
+        <p class="text-faint" style="font-size:11.5px;margin-top:10px;">
+          هیچ لابی عمومی وجود ندارد — فقط اتاق‌هایی که از همین‌جا می‌سازید قابل ورودند، و پس از «بستن» دیگر هیچ‌کس با لینک قبلی وارد نمی‌شود.
+        </p>
+      </section>
+
+      <section class="panel" style="padding:18px;">
+        <h2 style="font-weight:700;font-size:15px;margin-bottom:14px;">تغییر یوزرنیم و پسورد مدیر</h2>
+        <div class="flex flex-col gap-3" style="max-width:420px;">
+          <div>
+            <label class="label">رمز عبور فعلی</label>
+            <input id="cur-pass" type="password" class="input">
+          </div>
+          <div>
+            <label class="label">یوزرنیم جدید (اختیاری)</label>
+            <input id="new-user" class="input">
+          </div>
+          <div>
+            <label class="label">پسورد جدید (اختیاری)</label>
+            <input id="new-pass" type="password" class="input">
+          </div>
+          <button id="save-creds-btn" class="btn">ذخیره تغییرات</button>
+          <p id="creds-msg" class="hidden" style="font-size:12.5px;"></p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>
