@@ -1,0 +1,20 @@
+{
+  "name": "vortex-live-stream",
+  "version": "2.0.0",
+  "description": "Responsive live video conferencing platform with admin room management, moderation, and OBS integration — built for cPanel Node.js hosting.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "cookie-parser": "^1.4.7",
+    "bcryptjs": "^2.4.3"
+  },
+  "author": "Vortex Platform",
+  "license": "MIT"
+}
