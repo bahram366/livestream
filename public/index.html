@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<title>ورتکس لایو | کنفرانس ویدیویی</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="assets/poster.svg" type="image/svg+xml">
+<meta property="og:title" content="ورتکس لایو">
+<meta property="og:description" content="سیستم کنفرانس ویدیویی زنده و اختصاصی">
+<meta property="og:image" content="assets/poster.png">
+<script src="socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- ================= Loading state ================= -->
+  <div id="screen-loading" class="center-screen">
+    <div class="flex flex-col items-center gap-3">
+      <div class="spinner"></div>
+      <p class="text-muted">در حال بررسی وضعیت اتاق…</p>
+    </div>
+  </div>
+
+  <!-- ================= Invalid / no-room state ================= -->
+  <div id="screen-invalid" class="center-screen hidden">
+    <div class="card panel fade-in" style="padding:28px;">
+      <div class="flex flex-col items-center gap-3 text-center">
+        <div class="tally-dot" style="width:14px;height:14px;background:var(--tally);box-shadow:0 0 0 5px var(--tally-dim);"></div>
+        <h1 class="brand-title">اتاقی برای ورود وجود ندارد</h1>
+        <p class="text-muted" id="invalid-reason" style="line-height:1.9;">
+          این سیستم به‌صورت پیش‌فرض لابی عمومی ندارد؛ برای ورود باید لینک دعوت معتبری از سوی مدیر جلسه دریافت کنید.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Join screen ================= -->
+  <div id="screen-join" class="center-screen hidden">
+    <div class="card panel fade-in" style="padding:24px;">
+      <div class="text-center" style="margin-bottom:18px;">
+        <h1 class="brand-title">ورود به کنفرانس ورتکس</h1>
+        <p class="brand-sub mono" id="join-room-label" style="margin-top:6px;">ROOM —</p>
+      </div>
+
+      <div class="panel-2" style="border-radius:14px; overflow:hidden; aspect-ratio:16/9; position:relative; margin-bottom:16px;">
+        <video id="preview-video" style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);" autoplay playsinline muted></video>
+        <div style="position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:8px;">
+          <button id="preview-toggle-mic" class="btn btn-icon">🎤</button>
+          <button id="preview-toggle-cam" class="btn btn-icon">📷</button>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="label">نام و نام خانوادگی شما</label>
+          <input type="text" id="username-input" class="input" placeholder="مثلاً: علی محمدی" maxlength="40" autocomplete="off">
+        </div>
+        <button id="submit-join-btn" class="btn btn-primary w-full">ورود به جلسه</button>
+        <p id="join-error" class="hidden" style="color:var(--tally); font-size:12.5px; text-align:center;"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Conference workspace ================= -->
+  <div id="app-workspace" class="app-shell hidden">
+
+    <header class="header-bar">
+      <div class="flex items-center gap-3" style="min-width:0;">
+        <div class="tally-dot live"></div>
+        <span style="font-weight:800; font-size:14px; white-space:nowrap;">ورتکس لایو</span>
+        <span class="chip mono" id="room-code-chip">— </span>
+        <span class="chip mono" id="session-timer">۰۰:۰۰</span>
+        <span id="rec-badge" class="rec-badge hidden">● در حال ضبط</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="chip" id="participant-count-chip">۱ نفر</span>
+        <button id="copy-link-btn" class="btn btn-sm">کپی لینک دعوت</button>
+        <button id="copy-obs-btn" class="btn btn-sm btn-host-ghost hidden">لینک OBS</button>
+        <button id="mobile-toggle-sidebar" class="btn btn-sm">چت / کاربران</button>
+      </div>
+    </header>
+
+    <div class="main-area">
+      <div class="stage">
+        <div id="video-grid" class="video-grid">
+          <div id="local-video-container" class="video-tile">
+            <video id="local-video" autoplay playsinline muted style="transform:scaleX(-1);"></video>
+            <div class="tile-label">
+              <span id="local-user-badge">شما</span>
+              <span id="local-host-badge" class="hidden" style="color:var(--host);">👑 مدیر</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-scrim" id="sidebar-scrim"></div>
+      <aside class="sidebar" id="sidebar-panel">
+        <div class="flex" style="border-bottom:1px solid var(--border);">
+          <button id="tab-chat" class="btn" style="flex:1;border-radius:0;border-bottom:2px solid var(--link);color:var(--link);">گفتگو</button>
+          <button id="tab-users" class="btn" style="flex:1;border-radius:0;border-bottom:2px solid transparent;">کاربران</button>
+        </div>
+
+        <div id="panel-chat-area" class="flex flex-col" style="flex:1; min-height:0;">
+          <div id="chat-messages" class="flex flex-col gap-2" style="flex:1; overflow-y:auto; padding:12px; font-size:12.5px;">
+            <div class="text-faint text-center">به جلسه خوش آمدید 👋</div>
+          </div>
+          <div class="flex gap-2" style="padding:10px; border-top:1px solid var(--border);">
+            <input id="chat-input" class="input" placeholder="پیام خود را بنویسید…" maxlength="1000" autocomplete="off">
+            <button id="chat-send-btn" class="btn btn-primary">ارسال</button>
+          </div>
+        </div>
+
+        <div id="panel-users-area" class="hidden flex-col" style="flex:1; min-height:0; overflow-y:auto; padding:10px; gap:8px;">
+          <!-- injected user rows -->
+        </div>
+      </aside>
+    </div>
+
+    <footer class="controls-bar">
+      <button id="toggle-mic" class="btn">قطع صدا</button>
+      <button id="toggle-cam" class="btn">قطع دوربین</button>
+      <button id="share-screen" class="btn">اشتراک صفحه</button>
+      <button id="record-btn" class="btn btn-host-ghost hidden">شروع ضبط</button>
+      <button id="leave-btn" class="btn btn-danger">خروج از جلسه</button>
+    </footer>
+  </div>
+
+  <!-- ================= Kicked / closed overlay ================= -->
+  <div id="screen-ended" class="center-screen hidden" style="position:fixed; inset:0; z-index:100;">
+    <div class="card panel fade-in text-center" style="padding:28px;">
+      <h1 class="brand-title" id="ended-title">جلسه پایان یافت</h1>
+      <p class="text-muted" id="ended-reason" style="margin-top:8px; line-height:1.9;"></p>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
