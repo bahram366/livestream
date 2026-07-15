@@ -13,6 +13,20 @@
   // root, or e.g. '/vortex' when mounted under a sub-path.
   const BASE = window.__BASE_PATH__ || ''; // '' at root, e.g. '/vortex' under a sub-path
 
+  // Video quality tiers. This is a peer-to-peer mesh (every participant
+  // connects directly to every other one, no media server in the middle),
+  // so upload bandwidth is the real constraint: sending 4K to 5 people at
+  // once means encoding & uploading 5 separate 4K streams simultaneously.
+  // "Auto" picks a sensible tier from the participant count and then
+  // actively steps down further if it detects real packet loss.
+  const QUALITY_PRESETS = {
+    '4k':    { width: 3840, height: 2160, frameRate: 30, maxBitrate: 8000000, label: '4K' },
+    '1080p': { width: 1920, height: 1080, frameRate: 30, maxBitrate: 3000000, label: '1080p' },
+    '720p':  { width: 1280, height: 720,  frameRate: 30, maxBitrate: 1500000, label: '720p' },
+    '480p':  { width: 854,  height: 480,  frameRate: 24, maxBitrate: 600000,  label: '480p' }
+  };
+  const TIER_ORDER = ['480p', '720p', '1080p', '4k'];
+
   const state = {
     myId: 'u_' + Math.random().toString(36).slice(2, 10),
     myName: '',
@@ -26,7 +40,11 @@
     knownUsers: [],     // last room-users-update payload
     recording: false,
     joinedAt: null,
-    timerHandle: null
+    timerHandle: null,
+    qualityMode: 'auto',      // 'auto' | 'manual'
+    effectiveQuality: '720p',
+    networkPenalty: 0,        // 0..2, auto-mode step-down on detected packet loss
+    qualityMonitorHandle: null
   };
 
   // ---------------------------------------------------------------------
@@ -84,7 +102,7 @@
   async function setupPreview() {
     try {
       state.localStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24 } },
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
         audio: { echoCancellation: true, noiseSuppression: true }
       });
     } catch (err) {
@@ -156,6 +174,9 @@
     state.timerHandle = setInterval(updateTimer, 1000);
     updateTimer();
 
+    applyTier(computeAutoTier());
+    state.qualityMonitorHandle = setInterval(evaluateNetworkHealth, 6000);
+
     connectSocket();
   }
 
@@ -164,6 +185,110 @@
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
     const s = String(secs % 60).padStart(2, '0');
     $('session-timer').textContent = m + ':' + s;
+  }
+
+  // ---------------------------------------------------------------------
+  // Video quality management
+  // ---------------------------------------------------------------------
+  function tierIndex(t) { return TIER_ORDER.indexOf(t); }
+
+  // A sane starting point based on how many people are actually in the
+  // call — more remote peers means more simultaneous outgoing streams to
+  // encode & upload, so we start lower automatically rather than let
+  // everyone's connection choke trying to send 4K to 6 people at once.
+  function pickBaselineTier() {
+    const remoteCount = Object.keys(state.peers).length;
+    if (remoteCount <= 1) return '1080p';
+    if (remoteCount <= 3) return '720p';
+    return '480p';
+  }
+
+  function computeAutoTier() {
+    const baseline = pickBaselineTier();
+    const idx = Math.max(0, tierIndex(baseline) - state.networkPenalty);
+    return TIER_ORDER[idx];
+  }
+
+  function applyBitrateToSender(pc, tier) {
+    const preset = QUALITY_PRESETS[tier];
+    const sender = pc.getSenders && pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+    if (!sender) return;
+    const params = sender.getParameters();
+    if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+    params.encodings[0].maxBitrate = preset.maxBitrate;
+    sender.setParameters(params).catch(() => {});
+  }
+
+  async function applyTier(tier) {
+    const preset = QUALITY_PRESETS[tier];
+    if (!preset) return;
+    state.effectiveQuality = tier;
+
+    const track = state.localStream && state.localStream.getVideoTracks()[0];
+    if (track && !state.screenStream) {
+      try {
+        await track.applyConstraints({
+          width: { ideal: preset.width },
+          height: { ideal: preset.height },
+          frameRate: { ideal: preset.frameRate }
+        });
+      } catch (e) { /* camera can't hit this exact resolution — browser keeps the closest match */ }
+    }
+
+    Object.values(state.peers).forEach((pc) => applyBitrateToSender(pc, tier));
+
+    const chip = $('quality-chip');
+    if (chip) chip.textContent = 'کیفیت: ' + preset.label + (state.qualityMode === 'auto' ? ' (خودکار)' : '');
+  }
+
+  function reapplyAutoQuality() {
+    if (state.qualityMode !== 'auto') return;
+    const tier = computeAutoTier();
+    if (tier !== state.effectiveQuality) applyTier(tier);
+  }
+
+  function setQuality(requested) {
+    hide($('quality-panel'));
+    if (requested === 'auto') {
+      state.qualityMode = 'auto';
+      state.networkPenalty = 0;
+      applyTier(computeAutoTier());
+      addSystemMessage('کیفیت روی حالت خودکار تنظیم شد.', 'signal');
+    } else {
+      state.qualityMode = 'manual';
+      applyTier(requested);
+      addSystemMessage('کیفیت تصویر روی ' + QUALITY_PRESETS[requested].label + ' تنظیم شد.', 'signal');
+    }
+  }
+
+  // Runs periodically while in auto mode: reads real WebRTC stats (the
+  // receiver-reported fraction of lost packets) and steps quality down if
+  // the connection is actually struggling, and back up once it recovers.
+  async function evaluateNetworkHealth() {
+    if (state.qualityMode !== 'auto') return;
+    const peerConns = Object.values(state.peers);
+    if (!peerConns.length) return;
+
+    let worstLoss = 0;
+    for (const pc of peerConns) {
+      try {
+        const stats = await pc.getStats();
+        stats.forEach((r) => {
+          if (r.type === 'remote-inbound-rtp' && r.kind === 'video' && typeof r.fractionLost === 'number') {
+            worstLoss = Math.max(worstLoss, r.fractionLost);
+          }
+        });
+      } catch (e) { /* connection may be mid-negotiation, skip this tick */ }
+    }
+
+    if (worstLoss > 0.08 && state.networkPenalty < 2) {
+      state.networkPenalty++;
+      addSystemMessage('به‌خاطر افت کیفیت اینترنت، کیفیت تصویر خودکار کاهش یافت.', 'tally');
+      reapplyAutoQuality();
+    } else if (worstLoss < 0.02 && state.networkPenalty > 0) {
+      state.networkPenalty--;
+      reapplyAutoQuality();
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -251,6 +376,7 @@
       state.knownUsers = users;
       updateUsersList(users);
       selfHealConnections(users);
+      reapplyAutoQuality();
     });
 
     state.socket.on('kicked-by-host', () => {
@@ -312,6 +438,7 @@
 
     if (state.localStream) {
       state.localStream.getTracks().forEach((track) => pc.addTrack(track, state.localStream));
+      applyBitrateToSender(pc, state.effectiveQuality);
     } else {
       pc.addTransceiver('audio', { direction: 'recvonly' });
       pc.addTransceiver('video', { direction: 'recvonly' });
@@ -524,6 +651,20 @@
       setCamButtonState(t.enabled);
     };
 
+    $('quality-btn').onclick = (e) => {
+      e.stopPropagation();
+      $('quality-panel').classList.toggle('hidden');
+    };
+    document.querySelectorAll('.quality-opt').forEach((btn) => {
+      btn.onclick = () => setQuality(btn.getAttribute('data-q'));
+    });
+    document.addEventListener('click', (e) => {
+      const panel = $('quality-panel');
+      if (!panel.classList.contains('hidden') && !panel.contains(e.target) && e.target !== $('quality-btn')) {
+        hide(panel);
+      }
+    });
+
     $('share-screen').onclick = async () => {
       if (!state.screenStream) {
         try {
@@ -632,6 +773,7 @@
 
   function showEndedScreen(title, reason) {
     if (state.timerHandle) clearInterval(state.timerHandle);
+    if (state.qualityMonitorHandle) clearInterval(state.qualityMonitorHandle);
     Object.values(state.peers).forEach((pc) => pc.close());
     if (state.socket) state.socket.disconnect();
     $('ended-title').textContent = title;
