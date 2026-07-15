@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vortex — OBS Stage View</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="socket.io/socket.io.js"></script>
+<style>
+  /* Add ?transparent=1 to the OBS URL to use a chroma-friendly flat black
+     background instead of the gradient (set OBS Browser Source background
+     to "Shutdown source when not visible" off, and use this flat color as
+     a chroma key if you want a transparent-feeling capture). True alpha
+     transparency requires OBS's browser source "Custom CSS" / their newer
+     transparent capture support — a plain <video> in a browser can't emit
+     an alpha channel, so a solid key color is the practical route. */
+  body.obs-transparent { background: #000 !important; }
+  #obs-grid { padding: 16px; }
+  #obs-empty { color: var(--text-faint); font-family: var(--font-mono); font-size: 13px; }
+</style>
+</head>
+<body>
+  <div id="obs-root" class="center-screen" style="min-height:100vh;padding:0;">
+    <div id="obs-grid" class="video-grid w-full" style="max-width:100%;">
+      <div id="obs-empty" class="text-center w-full">در انتظار اتصال به اتاق…</div>
+    </div>
+  </div>
+  <script src="js/obs.js"></script>
+</body>
+</html>
