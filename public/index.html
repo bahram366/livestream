@@ -71,6 +71,7 @@
         <span style="font-weight:800; font-size:14px; white-space:nowrap;">ورتکس لایو</span>
         <span class="chip mono" id="room-code-chip">— </span>
         <span class="chip mono" id="session-timer">۰۰:۰۰</span>
+        <span class="chip" id="quality-chip">کیفیت: ۷۲۰p</span>
         <span id="rec-badge" class="rec-badge hidden">● در حال ضبط</span>
       </div>
       <div class="flex items-center gap-2">
@@ -121,6 +122,16 @@
       <button id="toggle-mic" class="btn">قطع صدا</button>
       <button id="toggle-cam" class="btn">قطع دوربین</button>
       <button id="share-screen" class="btn">اشتراک صفحه</button>
+      <div style="position:relative;">
+        <button id="quality-btn" class="btn">🎚️ کیفیت تصویر</button>
+        <div id="quality-panel" class="panel hidden" style="position:absolute; bottom:calc(100% + 8px); right:0; width:230px; padding:8px; z-index:50;">
+          <button class="btn w-full quality-opt" data-q="auto" style="justify-content:flex-start; margin-bottom:4px;">خودکار (پیشنهادی)</button>
+          <button class="btn w-full quality-opt" data-q="4k" style="justify-content:flex-start; margin-bottom:4px;">4K — فقط برای ۱ تا ۲ نفر</button>
+          <button class="btn w-full quality-opt" data-q="1080p" style="justify-content:flex-start; margin-bottom:4px;">1080p — کیفیت بالا</button>
+          <button class="btn w-full quality-opt" data-q="720p" style="justify-content:flex-start; margin-bottom:4px;">720p — متعادل</button>
+          <button class="btn w-full quality-opt" data-q="480p" style="justify-content:flex-start;">480p — اینترنت ضعیف</button>
+        </div>
+      </div>
       <button id="record-btn" class="btn btn-host-ghost hidden">شروع ضبط</button>
       <button id="leave-btn" class="btn btn-danger">خروج از جلسه</button>
     </footer>
